@@ -24,8 +24,6 @@ SMOOTHING_FACTOR = 10
 # A larger delay gives worse results but is also better for battery life
 SAMPLE_DELAY_SECONDS = 1.0 
 
-
-
 class SpeedGetter < Object
   attr_reader :snmp_agent
   attr_reader :snmp_community
@@ -79,6 +77,12 @@ class SpeedGetter < Object
     end
 
     bits_per_second = (@deltas.mean() / sample_delay) * 8.0
+
+    # the snmp counter can eventually roll over, which would lead to a negative
+    # delta; in that case, just reset to 0. This will get smoothed out by the 
+    # ring buffer once it makes another circuit 
+    bits_per_second = 0 if bits_per_second < 0
+
     kilobits_per_second = bits_per_second / 1000.0
     megabits_per_second = kilobits_per_second / 1000.0
 
