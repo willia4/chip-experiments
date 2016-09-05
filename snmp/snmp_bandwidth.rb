@@ -51,27 +51,6 @@ class RingBuffer < Array
   alias :push :<<
 end
 
-def get_tree_vars(tree)
-  vars = Array.new
-
-  SNMP::Manager.open(:host=>ROUTER, :community=>COMMUNITY) do |manager|
-
-    table = SNMP::ObjectId.new(tree)
-      next_oid = table
-      
-      while next_oid.subtree_of?(table)
-          response = manager.get_next(next_oid)
-          
-          varbind = response.varbind_list.first
-          next_oid = varbind.name
-          
-          vars << varbind
-      end
-  end
-
-  return vars
-end
-
 class SpeedGetter < Object
   attr_reader :snmp_agent
   attr_reader :snmp_community
