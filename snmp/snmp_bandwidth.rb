@@ -103,11 +103,14 @@ while !$stop
   speed = speed_getter.get_current_speed(SAMPLE_DELAY_SECONDS)
 
   if speed[:megabits_per_second] > 1
-    print "\r #{speed[:megabits_per_second]} Mbps                            "
+    print "\r %.02f Mbps" % speed[:megabits_per_second]
+    print "                                           "
   elsif speed[:kilobits_per_second] > 1
-    print "\r #{speed[:kilobits_per_second]} Kbps                            "
+    print "\r %.02f Kbps" % speed[:kilobits_per_second]
+    print "                                           "
   else
-    print "\r #{speed[:bits_per_second]} Bbps                                "
+    print "\r %.02f Bps" % speed[:bits_per_second]
+    print "                                           "
   end
       
 end
