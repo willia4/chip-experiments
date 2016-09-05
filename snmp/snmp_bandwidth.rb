@@ -2,13 +2,27 @@
 
 require 'snmp'
 
-ROUTER = 'router1'
-COMMUNITY = 'main'
-WAN = 'eth0'
+# the host name or IP address of the the device to interrogate over snmp
+SNMP_AGENT = 'router1'    
 
-IF_TREE = "1.3.6.1.2.1.2.2"
-#BANDWIDTH_COUNTER_OID = "IF-MIB::ifInOctets.2"
-BANDWIDTH_COUNTER_OID = "IF-MIB::ifHCInOctets.2"
+# the community password for the snmp agent
+SNMP_COMMUNITY = 'main'  
+
+# the snmp counter to average out; must be an INTEGER
+SNMP_BANDWIDTH_COUNTER_OID = "IF-MIB::ifHCInOctets.2" 
+
+# the number of samples to use for a rolling bandwidth average
+# a higher number will be smoother but will take longer to change
+# a lower number will be more accurate "in the moment", but may jump
+# all over the place 
+SMOOTHING_FACTOR = 10 
+
+# the number of seconds between samples. 
+# A lower number will be more accurate and responsive but too many 
+# samples may burden your SNMP agent or your polling device
+# A larger delay gives worse results but is also better for battery life
+SAMPLE_DELAY_SECONDS = 1.0 
+
 class RingBuffer < Array 
   attr_reader :max_size
 
@@ -57,34 +71,6 @@ def get_tree_vars(tree)
 
   return vars
 end
-
-# interface_vars = get_tree_vars(IF_TREE)
-
-# index_vars = interface_vars.select do |v| 
-#   mib = v.name.instance_eval { @mib }
-#   name = mib.name v.name 
-#   name.start_with?("IF-MIB::ifIndex\.")
-# end
-
-# description_vars = interface_vars.select do |v| 
-#   mib = v.name.instance_eval { @mib }
-#   name = mib.name v.name 
-#   name.start_with?("IF-MIB::ifDescr\.")
-# end
-
-# wan_description = description_vars.select do |v|
-#   v.value == WAN
-# end
-
-# wan_description = wan_description.first
-
-# wan_index = (wan_description.name.instance_eval { @mib }).name(wan_description.name)
-# wan_index = /.*\.([0-9]*)/.match(wan_index).captures[0]
-# wan_index = wan_index.to_i
-
-# puts "index: #{index_vars.size}"
-# puts "description: #{description_vars.first}"
-# puts "#{wan_description.value}: #{wan_index}"
 
 class SpeedGetter < Object
   attr_reader :snmp_agent
@@ -153,10 +139,10 @@ end
 $stop = false
 trap("SIGINT") { $stop = true }
 
-speed_getter = SpeedGetter.new(ROUTER, COMMUNITY, BANDWIDTH_COUNTER_OID, 10)
+speed_getter = SpeedGetter.new(SNMP_AGENT, SNMP_COMMUNITY, SNMP_BANDWIDTH_COUNTER_OID, SMOOTHING_FACTOR)
 
 while !$stop
-  speed = speed_getter.get_current_speed(0.5)
+  speed = speed_getter.get_current_speed(SAMPLE_DELAY_SECONDS)
 
   if speed[:megabits_per_second] > 1
     print "\r #{speed[:megabits_per_second]} Mbps                            "
