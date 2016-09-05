@@ -17,3 +17,7 @@ I found `IF-MIB::ifName.2 = STRING: eth0` which tells me that my router reports 
 I then found `IF-MIB::ifInOctets.2` which is a counter that tells me how many bytes have come in on that interface since the router started counting. 
 
 So `IF-MIB::ifInOctets.2` will be the numeric counter for reporting my bandwidth. I'll use this to configure the script.
+
+# Gems
+
+    gem install snmp
