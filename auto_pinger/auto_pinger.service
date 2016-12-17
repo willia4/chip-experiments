@@ -1,0 +1,10 @@
+[Unit]
+Description=ping a system on a button press
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/auto_pinger --button-gpio 1013 --use-pwm-indicator --ping-IP 10.0.1.44
+
+[Install]
+WantedBy=default.target
