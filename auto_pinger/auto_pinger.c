@@ -12,10 +12,11 @@
 #include <assert.h>
 
 #define debug_printf //printf
+#define fork_printf //printf 
 
 static inline void increment_progress() {
-	fwrite(".", sizeof(char), 1, stdout);
-	fflush(stdout);
+	//fwrite(".", sizeof(char), 1, stdout);
+	//fflush(stdout);
 }
 
 typedef struct argumentInfo_t {
@@ -59,6 +60,16 @@ void write_to_path(char *file_path, char *value) {
 	write(fd, value, strlen(value));
 	sleep(1);
 	close(fd);
+}
+
+static inline int signal_and_wait(pid_t pid, int signal) {
+	kill(pid, signal);
+
+	int status;
+	pid_t wpid = waitpid(pid, &status, 0);
+	assert(wpid == pid);
+
+	return status;
 }
 
 void init_button(int button_gpio) {
@@ -182,9 +193,9 @@ void stop_pulse(pid_t pid) {
 	if (!pid) {
 		return;
 	}
-
-	kill(pid, SIGHUP);
-
+	
+	signal_and_wait(pid, SIGHUP);
+	
 	char buf[1024];
 	lseek(pwm_fd, 0, SEEK_SET);
 	read(pwm_fd, &buf, 1023);
@@ -239,13 +250,19 @@ void do_ping(char *pingIP) {
 
 	if (ping_pid == 0) {
 		execvp(argv[0], argv);
+		printf("Should never get here\n");
 	}
+
+	printf("Pinging on PID %d\n", ping_pid);
 
 	pid_t pulse_pid = pulse_led();
 
+	printf("Pulsing on PID %d\n", pulse_pid);
+
 	sleep(5);
 
-	kill(ping_pid, SIGTERM);
+	signal_and_wait(ping_pid, SIGTERM);
+	
 	stop_pulse(pulse_pid);
 }
 
@@ -258,7 +275,7 @@ void exit_usage(char *error) {
 
 	printf("\n");
 	printf("Usage: %s --ping-IP {IP Address} --button-gpio {INT} [--use-pwm-indicator]\n\n", __progname);
-	printf("\t--ping-IP {IP Address\t\tRequired: The IP address to ping when the button is pressed\n");
+	printf("\t--ping-IP {IP Address}\t\tRequired: The IP address to ping when the button is pressed\n");
 	printf("\t--button-gpio {INT}\t\tRequired: The GPIO pin to monitor\n");
 	printf("\t--use-pwm-indicator\t\tOptional: Pulse an LED connected to PWM0\n");
 	printf("\n\n");
@@ -348,9 +365,7 @@ argumentInfo_t parse_arguments(int argc, char **argv) {
 	return r;
 }
 
-int main(int argc, char **argv) {
-	argumentInfo_t args = parse_arguments(argc, argv);
-
+void forked_main(argumentInfo_t args) {
 	char buf[1024];
 	int ready_fd; 
 
@@ -391,4 +406,29 @@ int main(int argc, char **argv) {
 			do_ping(args.pingIP);	
 		}
 	}
+}
+
+int main(int argc, char **argv) {
+	argumentInfo_t args = parse_arguments(argc, argv);
+
+	pid_t pid = fork();
+
+	if (pid < 0) {
+		printf("Could not fork a daemon process\n");
+		exit(100);
+	}
+
+	if (pid > 0) {
+		//kill the parent process 
+		printf("Process forked to %d\n", pid);
+		exit(0);
+	}
+
+	pid_t sid = setsid();
+	if (sid < 0) {
+		exit(200);
+	}
+
+	forked_main(args);
+	return -1;
 }
