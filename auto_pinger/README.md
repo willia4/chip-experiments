@@ -2,7 +2,7 @@
 
 [I noticed that my CHIP would become inaccessible to my Mac][forum] until the CHIP pinged the Mac. I needed a way to automate this without having terminal access to the CHIP itself (since it was inaccessible). I decided to make it complicated. 
 
-This utility allows you to assign a GPIO button the task of pinging an arbitrary computer. 
+This utility allows you to assign a GPIO button the task of pinging an arbitrary computer, or it can ping a computer every `n` seconds, or it can do both.  
 
 It can also pulse an LED to indicate that it's performing the ping. 
 
@@ -10,7 +10,7 @@ It can also pulse an LED to indicate that it's performing the ping.
 
 ## Hardware Installation 
 
-Connect a button to an XIO GPIO pin on the CHIP. An XIO pin must be used because they support hardware interrupts. Connect the other end of the button to ground. 
+If desired, connect a button to an XIO GPIO pin on the CHIP. An XIO pin must be used because they support hardware interrupts. Connect the other end of the button to ground. 
 
 If desired, connect an LED annode (long lead) to PWM0 and the other end to ground. In this setup, PWM0 can source several milliamps of current to the LED. Use a resistor to limit the current. 
 
@@ -28,7 +28,19 @@ Once the service is installed and enabled, it should start on boot.
 
 #### Configure the service
 
-Edit the `auto_pinger.service` file and set the --button-gpio parameter and --ping-IP parameter to the correct values for your setup. Remove the --use-pwm-indicator argument if you have not hooked up an LED to PWM0. 
+Edit the `auto_pinger.service` file and adjust the `ExecStart=` section.
+
+If you want to use a hardware button to ping a system, set the --button-gpio parameter to 
+the GPIO pin for your button. 
+
+Add the --use-pwm-indicator argument if you want to hook up an LED to PWM0.
+
+Adjust the --auto parameter to a more suitable value (in seconds) if the default doesn't work for you. Or remove --auto altogether if you want to just use a button. 
+
+#### Example 
+To use a button on XIO0, strobe an LED, and automatically ping 10.0.1.1 every 30 seconds: 
+
+    ExecStart=/usr/local/bin/auto_pinger --button-gpio 1013 --auto 30 --use-pwm-indicator --ping-IP 10.0.1.1
 
 #### Install the service
 
@@ -38,6 +50,8 @@ Edit the `auto_pinger.service` file and set the --button-gpio parameter and --pi
 #### Start the service
 
     service auto_pinger start
+
+You can look for messages from the service via `cat /var/log/syslog`. 
 
 #### Stop the service
 

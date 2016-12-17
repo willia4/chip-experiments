@@ -8,15 +8,16 @@
 #include <stdbool.h>
 #include <limits.h>
 #include <sys/types.h>
+#include <sys/timerfd.h>
 #include <dirent.h>
 #include <assert.h>
+#include <errno.h>
 
 #define debug_printf //printf
-#define fork_printf //printf 
 
 static inline void increment_progress() {
-	//fwrite(".", sizeof(char), 1, stdout);
-	//fflush(stdout);
+	fwrite(".", sizeof(char), 1, stdout);
+	fflush(stdout);
 }
 
 typedef struct argumentInfo_t {
@@ -24,11 +25,13 @@ typedef struct argumentInfo_t {
 	bool usePWM;
 	char *pingIP;
 	bool deamonize;
+	int autoSecs;
 } argumentInfo_t;
 
 // Process-Wide Variables
-int button_fd;
-int pwm_fd; 
+int button_fd = 0;
+int pwm_fd = 0; 
+int timer_fd = 0;
 
 #define PWM_MAX 1000
 
@@ -173,17 +176,51 @@ void init_pwm() {
 	increment_progress();
 }
 
-void init(int button_gpio, bool usePWM) {
+void init_timer(int autoSecs) {
+	debug_printf("Creating timer fd\n");
+	timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
+	increment_progress();
+
+	assert(timer_fd != 0);
+	debug_printf("Created fd %d\n", timer_fd);
+
+	struct itimerspec timer_setting; 
+	
+	timer_setting.it_interval.tv_sec = autoSecs;
+	timer_setting.it_interval.tv_nsec = 0;
+
+	//fire immediately to ensure that the system is available by SSH on reboot
+	timer_setting.it_value.tv_sec = 1;
+	timer_setting.it_value.tv_nsec = 0;
+	
+	debug_printf("Setting timer for %d seconds\n", autoSecs);
+	if(timerfd_settime(timer_fd, 0, &timer_setting, NULL) != 0) {
+		printf("Got an error when setting timer: %s\n", strerror(errno));
+		exit(6);
+	}
+	increment_progress();
+}
+
+void init(int button_gpio, bool usePWM, int autoSecs) {
 	button_fd = 0;
 	pwm_fd = 0;
 
-	init_button(button_gpio);
-
+	if(button_gpio > 0) {
+		init_button(button_gpio);	
+	}
+	
 	if(usePWM) {
 		init_pwm();	
 	}
 
-	printf("\n");
+	if(autoSecs > 0) {
+		init_timer(autoSecs);
+	}
+
+	debug_printf("Created FDs:\n");
+	debug_printf("\tButton: %d\n", button_fd);
+	debug_printf("\tPWM: %d\n", pwm_fd);
+	debug_printf("\tTimer: %d\n", timer_fd);
 }
 
 void pulse_signal_handler(int sig_num) {
@@ -277,8 +314,9 @@ void exit_usage(char *error) {
 	printf("\n");
 	printf("Usage: %s --ping-IP {IP Address} --button-gpio {INT} [--use-pwm-indicator] [-d]\n\n", __progname);
 	printf("\t--ping-IP {IP Address}\t\tRequired: The IP address to ping when the button is pressed\n");
-	printf("\t--button-gpio {INT}\t\tRequired: The GPIO pin to monitor\n");
+	printf("\t--button-gpio {INT}\t\tRequired if --auto is not specified: The GPIO pin to monitor\n");
 	printf("\t--use-pwm-indicator\t\tOptional: Pulse an LED connected to PWM0\n");
+	printf("\t--auto {Seconds}\t\tOptional: Will auto-ping every number of seconds\n");
 	printf("\t-d\t\tOptional: run in a background process\n");
 	printf("\n\n");
 	printf("The GPIO pin for the button must be an XIO pin. These support \n");
@@ -302,6 +340,9 @@ argumentInfo_t parse_arguments(int argc, char **argv) {
 	bool sawButtonGpio = false;
 	bool sawUsePWM = false; 
 	bool sawPingIP = false; 
+	bool sawAuto = false;
+
+	int autoSecs = 0;
 
 	char errorMessage[1024];
 	char *parseEnd;
@@ -352,6 +393,27 @@ argumentInfo_t parse_arguments(int argc, char **argv) {
 			nextArg = argv[i];
 			r.pingIP = nextArg;
 		}
+		else if(strcmp(currentArg, "--auto") == 0) {
+			if(sawAuto) {
+				exit_usage("--auto can only be specified once");
+			}
+			sawAuto = true; 
+
+			i++;
+			if(i > argc) {
+				exit_usage("Must supply a number of seconds after --auto");
+			}
+
+			nextArg = argv[i];
+			r.autoSecs = strtol(nextArg, &parseEnd, 10);
+			if(*parseEnd) {
+				exit_usage("Must supply integer for --button-gpio argument");
+			}
+
+			if(r.autoSecs <= 0) {
+				exit_usage("Must supply a positive number of seconds to --auto");
+			}
+		}
 		else if(strcmp(currentArg, "-d") == 0) {
 			r.deamonize = true;
 		}
@@ -361,8 +423,8 @@ argumentInfo_t parse_arguments(int argc, char **argv) {
 		}
 	}
 
-	if(!sawButtonGpio) {
-		exit_usage("--button-gpio is required");
+	if(!sawButtonGpio && !sawAuto) {
+		exit_usage("--button-gpio is required is --auto is not present");
 	}
 	if(!sawPingIP) {
 		exit_usage("--ping-IP is required");
@@ -373,43 +435,93 @@ argumentInfo_t parse_arguments(int argc, char **argv) {
 
 void forked_main(argumentInfo_t args) {
 	char buf[1024];
-	int ready_fd; 
+	uint64_t timer_data = 0;
 
 	printf("*** Initializing System *** \n");
-	init(args.buttonGpio, args.usePWM);
+	init(args.buttonGpio, args.usePWM, args.autoSecs);
 
-	debug_printf("Reading value before polling\n");
-	lseek(button_fd, 0, SEEK_SET);
-	read(button_fd, &buf, 1023);
-
-	int epfd = epoll_create(1);
+	int max_events = 2; //at most, we have one button and one timer
 	
-	struct epoll_event poll_data;
-	struct epoll_event poll_ready;
+	int epfd = epoll_create(max_events);
 
-	poll_data.events = EPOLLPRI;
-	poll_data.data.fd = button_fd;
+	struct epoll_event *epoll_data = malloc(sizeof(struct epoll_event) * max_events);
+	struct epoll_event *epoll_ready = malloc(sizeof(struct epoll_event) * max_events);
 
-	int n = epoll_ctl(epfd, EPOLL_CTL_ADD, button_fd, &poll_data);
+	int pollCount = 0;
+	if(button_fd) {	
+		debug_printf("Reading button value before polling\n");
+		lseek(button_fd, 0, SEEK_SET);
+		read(button_fd, &buf, 1023);
 
-	printf("*** READY ***\n\n");
+		debug_printf("Initializing epoll data for button: %d\n", button_fd);
 
+		epoll_data[pollCount].events = EPOLLPRI;
+		epoll_data[pollCount].data.fd = button_fd;
+
+		pollCount++; 
+	}
+
+	if(timer_fd) { 
+		debug_printf("Initializing epoll data for timer: %d\n", timer_fd);
+
+		epoll_data[pollCount].events = EPOLLIN;
+		epoll_data[pollCount].data.fd = timer_fd;
+		
+		pollCount++; 
+	}
+
+	int i;
+	for(i = 0; i < pollCount; i++) {
+		debug_printf("Adding epoll for fd %d\n", epoll_data[i].data.fd);
+
+		if(epoll_ctl(epfd, EPOLL_CTL_ADD, epoll_data[i].data.fd, &epoll_data[i]) != 0) {
+			printf("Could not add epoll FD %d: %s\n\n", i, strerror(errno));
+			exit(3);
+		}
+	}
+
+	printf("\n*** READY ***\n\n");
+
+	int ready_fds;
+	int n;
 	while(1) {
 		debug_printf("Polling\n");
-		n = epoll_wait(epfd, &poll_ready, 1, -1);
-		debug_printf("epoll returned\n");
+		ready_fds = epoll_wait(epfd, epoll_ready, max_events, -1);
+		debug_printf("epoll returned %d fds\n", ready_fds);
 
-		memset(&buf, 0, 1024 * sizeof(char));
+		for(i = 0; i < ready_fds; i++) {
+			debug_printf("Looking at returned FD %d\n", i);
+			debug_printf("\tFD: %d\n", epoll_ready[i].data.fd);
 
-		n = lseek(button_fd, 0, SEEK_SET);
-		n = read(button_fd, &buf, 1024);
+			if (epoll_ready[i].data.fd == button_fd) {
+				debug_printf("Processing FD as the button\n");
 
-		buf[1023] = '\0';
-		debug_printf("Read: %s\n", buf);
+				memset(&buf, 0, 1024 * sizeof(char));
 
-		//if (buf[0] == '1') {
-		if(strncmp(buf, "1\n", n) == 0) {
-			do_ping(args.pingIP);	
+				n = lseek(button_fd, 0, SEEK_SET);
+				n = read(button_fd, &buf, 1024);
+
+				buf[1023] = '\0';
+				debug_printf("Read: %s\n", buf);
+
+				if(strncmp(buf, "1\n", n) == 0) {
+					do_ping(args.pingIP);	
+				}
+			}
+			else if (epoll_ready[i].data.fd == timer_fd) {
+				debug_printf("Processing FD as the timer\n");
+				
+				debug_printf("Consuming timer data\n");
+				n = read(timer_fd, &timer_data, sizeof(timer_data));
+				debug_printf("Read timer bytes: %d\n", n);
+				debug_printf("Read timer data: %lld\n", timer_data);
+
+				do_ping(args.pingIP);
+			}
+			else {
+				printf("Unexpected fd returned by epoll\n");
+				exit(4);
+			}
 		}
 	}
 }
