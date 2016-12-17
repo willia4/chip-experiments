@@ -71,14 +71,8 @@ It's written in C, a language I haven't touched since college. Which is to say, 
 
 It uses the epoll function to watch for hardware interrupts on the GPIO pin. 
 
+Because it uses timerfd support, it also uses epoll to watch for timer events. This was a really pleasant way to do things. 
+
 It uses the PWM0 pin to pulse an LED instead of just having it be on or off. 
 
 It uses `fork` instead of threads for parallel processing. I've never done this before. So I am almost certainly doing it poorly. 
-
-## The Future
-
-This is actually a very silly way to accomplish this goal. It ties up two pins that I would prefer to use for something else. 
-
-My next project will be to make it automatically ping the other computer every `n` seconds. Then it can simply run in the background while I do other things. But this seemed like a good opportunity to play with buttons and interrupts so I did it first. 
-
-I also don't enjoy writing in C and need to figure out how to use `epoll` (or similar) to watch for GPIO pins from ruby or python. 
