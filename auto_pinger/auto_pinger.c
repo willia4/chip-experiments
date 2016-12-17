@@ -23,6 +23,7 @@ typedef struct argumentInfo_t {
 	int buttonGpio;
 	bool usePWM;
 	char *pingIP;
+	bool deamonize;
 } argumentInfo_t;
 
 // Process-Wide Variables
@@ -62,7 +63,7 @@ void write_to_path(char *file_path, char *value) {
 	close(fd);
 }
 
-static inline int signal_and_wait(pid_t pid, int signal) {
+static int signal_and_wait(pid_t pid, int signal) {
 	kill(pid, signal);
 
 	int status;
@@ -274,10 +275,11 @@ void exit_usage(char *error) {
 	}
 
 	printf("\n");
-	printf("Usage: %s --ping-IP {IP Address} --button-gpio {INT} [--use-pwm-indicator]\n\n", __progname);
+	printf("Usage: %s --ping-IP {IP Address} --button-gpio {INT} [--use-pwm-indicator] [-d]\n\n", __progname);
 	printf("\t--ping-IP {IP Address}\t\tRequired: The IP address to ping when the button is pressed\n");
 	printf("\t--button-gpio {INT}\t\tRequired: The GPIO pin to monitor\n");
 	printf("\t--use-pwm-indicator\t\tOptional: Pulse an LED connected to PWM0\n");
+	printf("\t-d\t\tOptional: run in a background process\n");
 	printf("\n\n");
 	printf("The GPIO pin for the button must be an XIO pin. These support \n");
 	printf("interrupts.\n");
@@ -295,6 +297,7 @@ argumentInfo_t parse_arguments(int argc, char **argv) {
 	r.buttonGpio = -1;
 	r.usePWM = false;
 	r.pingIP = NULL;
+	r.deamonize = false;
 
 	bool sawButtonGpio = false;
 	bool sawUsePWM = false; 
@@ -336,7 +339,7 @@ argumentInfo_t parse_arguments(int argc, char **argv) {
 
 			r.usePWM = true;
 		}
-		else if(strcmp(currentArg, "--ping-IP") ==0) {
+		else if(strcmp(currentArg, "--ping-IP") == 0) {
 			if(sawPingIP) {
 				exit_usage("--ping-IP can only be specified once");
 			}
@@ -348,6 +351,9 @@ argumentInfo_t parse_arguments(int argc, char **argv) {
 			}
 			nextArg = argv[i];
 			r.pingIP = nextArg;
+		}
+		else if(strcmp(currentArg, "-d") == 0) {
+			r.deamonize = true;
 		}
 		else {
 			snprintf(errorMessage, 1024, "Invalid argument: %s", currentArg);
@@ -411,24 +417,10 @@ void forked_main(argumentInfo_t args) {
 int main(int argc, char **argv) {
 	argumentInfo_t args = parse_arguments(argc, argv);
 
-	pid_t pid = fork();
-
-	if (pid < 0) {
-		printf("Could not fork a daemon process\n");
-		exit(100);
+	if (args.deamonize) {
+		daemon(0, 0);	
 	}
-
-	if (pid > 0) {
-		//kill the parent process 
-		printf("Process forked to %d\n", pid);
-		exit(0);
-	}
-
-	pid_t sid = setsid();
-	if (sid < 0) {
-		exit(200);
-	}
-
+	
 	forked_main(args);
 	return -1;
 }
