@@ -1,0 +1,10 @@
+[Unit]
+Description=Automatically ping a system
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/auto_pinger --auto 180 --ping-IP 10.0.1.44
+
+[Install]
+WantedBy=default.target
