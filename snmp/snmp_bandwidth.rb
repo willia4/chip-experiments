@@ -1,29 +1,29 @@
 #!/usr/bin/env ruby
 
 require 'snmp'
-require './ring_buffer.rb'
+require "#{File.expand_path(File.dirname(__FILE__))}/ring_buffer.rb"
 
-# the host name or IP address of the the device to interrogate over snmp
-SNMP_AGENT = 'router1'    
+# # the host name or IP address of the the device to interrogate over snmp
+# SNMP_AGENT = 'router1'    
 
-# the community password for the snmp agent
-SNMP_COMMUNITY = 'main'  
+# # the community password for the snmp agent
+# SNMP_COMMUNITY = 'main'  
 
-# the snmp counter to average out; must be an INTEGER
-SNMP_BANDWIDTH_COUNTER_OID = "IF-MIB::ifHCInOctets.2" 
+# # the snmp counter to average out; must be an INTEGER
+# SNMP_BANDWIDTH_COUNTER_OID = "IF-MIB::ifHCInOctets.2" 
 
-# the number of samples to use for a rolling bandwidth average
-# a higher number will be smoother but will take longer to change
-# a lower number will be more accurate "in the moment", but may jump
-# all over the place 
-SMOOTHING_FACTOR = 10 
+# # the number of samples to use for a rolling bandwidth average
+# # a higher number will be smoother but will take longer to change
+# # a lower number will be more accurate "in the moment", but may jump
+# # all over the place 
+# SMOOTHING_FACTOR = 10 
 
-# the number of seconds between samples. 
-# A lower number will be more accurate and responsive but too many 
-# samples may burden your SNMP agent or your polling device
-# A larger delay gives worse results but is also better for battery life
-SAMPLE_DELAY_SECONDS = 1.0 
-
+# # the number of seconds between samples. 
+# # A lower number will be more accurate and responsive but too many 
+# # samples may burden your SNMP agent or your polling device
+# # A larger delay gives worse results but is also better for battery life
+# SAMPLE_DELAY_SECONDS = 1.0 
+  
 class SpeedGetter < Object
   attr_reader :snmp_agent
   attr_reader :snmp_community
@@ -94,26 +94,26 @@ class SpeedGetter < Object
   end
 end
 
-$stop = false
-trap("SIGINT") { $stop = true }
+# $stop = false
+# trap("SIGINT") { $stop = true }
 
-speed_getter = SpeedGetter.new(SNMP_AGENT, SNMP_COMMUNITY, SNMP_BANDWIDTH_COUNTER_OID, SMOOTHING_FACTOR)
+# speed_getter = SpeedGetter.new(SNMP_AGENT, SNMP_COMMUNITY, SNMP_BANDWIDTH_COUNTER_OID, SMOOTHING_FACTOR)
 
-while !$stop
-  speed = speed_getter.get_current_speed(SAMPLE_DELAY_SECONDS)
+# while !$stop
+#   speed = speed_getter.get_current_speed(SAMPLE_DELAY_SECONDS)
 
-  if speed[:megabits_per_second] > 1
-    print "\r %.02f Mbps" % speed[:megabits_per_second]
-    print "                                           "
-  elsif speed[:kilobits_per_second] > 1
-    print "\r %.02f Kbps" % speed[:kilobits_per_second]
-    print "                                           "
-  else
-    print "\r %.02f Bps" % speed[:bits_per_second]
-    print "                                           "
-  end
+#   if speed[:megabits_per_second] > 1
+#     print "\r %.02f Mbps" % speed[:megabits_per_second]
+#     print "                                           "
+#   elsif speed[:kilobits_per_second] > 1
+#     print "\r %.02f Kbps" % speed[:kilobits_per_second]
+#     print "                                           "
+#   else
+#     print "\r %.02f Bps" % speed[:bits_per_second]
+#     print "                                           "
+#   end
       
-end
+# end
 
-puts ""
-puts "Quiting"
+# puts ""
+# puts "Quiting"
