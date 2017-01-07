@@ -1,0 +1,147 @@
+require 'chip-gpio'
+
+module PWM_5947
+  class PWM    
+    attr_reader :num_pins
+    attr_reader :resolution_bits
+    attr_reader :max_value 
+
+    def initialize(latch_pin: null, clock_pin: null, data_pin: null)
+      pins = ChipGPIO.get_pins
+      
+      @latch = pins[latch_pin]
+      @clock = pins[clock_pin]
+      @data = pins[data_pin]
+
+      @latch.export if not @latch.available?
+      @clock.export if not @clock.available?
+      @data.export if not @data.available?
+
+      @latch.direction = :output
+      @clock.direction = :output
+      @data.direction = :output
+
+      @latch.value = 0
+      @clock.value = 0
+      @data.value = 0
+
+      @num_pins = 24
+      @resolution_bits = 12
+      @max_value = (2**@resolution_bits)-1
+
+      @values = Array.new
+      @num_pins.times { @values.push(0) }
+
+      self.reset_all()
+    end
+
+    def values 
+      r = Array.new
+      @values.each { |v| r.push(v) }
+      return r
+    end
+
+    def set_value(pwm_pin: null, pwm_value: null)
+      # Raise an error if they don't specify a valid pin
+      raise ArgumentError, "Must specify a PWM pin" if !pwm_pin
+      raise ArgumentError, "PWM pin must be greater than 0" if pwm_pin < 0
+      raise ArgumentError, "PWM pin must be less than #{@num_pins}" if pwm_pin >= @num_pins
+
+      # But an invalid value is fine since we know how to clamp it sanely
+      pwm_value = 0 if !pwm_value
+      pwm_value = 0 if pwm_value < 0
+      pwm_value = @max_value if pwm_value > @max_value
+
+      @values[pwm_pin] = pwm_value
+    end
+
+    def flush_values()
+      #write out the pins in reverse order 
+      #(use the ... range operator to be an exclusive range as well)
+      (0...@num_pins).reverse_each do |pwm|
+        pwm_value = @values[pwm]
+
+        #write out the bits in reverse order as well 
+        (0...@resolution_bits).reverse_each do |bit|
+          @clock.value = 0
+
+          if (pwm_value & (1 << bit)) > 0
+            @data.value = 1
+          else
+            @data.value = 0
+          end
+
+          @clock.value = 1
+        end
+      end
+
+      @clock.value = 0
+      @latch.value = 1
+      @latch.value = 0
+    end
+
+    def reset_all
+      num_pins.times.each { |i| values[i] = 0 }
+      flush_values()
+    end
+
+  end
+end
+
+# def test 
+#   pwm = PWM_5947::PWM.new(latch_pin: :XIO1, data_pin: :XIO5, clock_pin: :XIO3)
+  
+#   meters = Array.new()
+#   meters.push({ :pin=> 18, :value=> 0, :direction => :ascending })
+#   meters.push({ :pin => 12, :value=> pwm.max_value, :direction => :descending })
+#   step = (0.10 * pwm.max_value).ceil
+
+#   $stop = false 
+#   trap("SIGINT") { $stop = true }
+
+#   while !$stop
+#     meters.each do |m|
+#       if m[:direction] == :ascending
+#         m[:value] = m[:value] + step 
+
+#         if (m[:value] > pwm.max_value) 
+#           m[:value] = pwm.max_value
+#           m[:direction] = :descending
+#         end
+#       else
+#         m[:value] = m[:value] - step 
+
+#         if (m[:value] < 0) 
+#           m[:value] = 0
+#           m[:direction] = :ascending
+#         end
+#       end
+
+#       pwm.set_value(pwm_pin: (m[:pin]), pwm_value: (m[:value]))
+#     end
+
+#     pwm.flush_values if !$stop
+
+#     sleep(0.005) if !$stop
+#   end
+
+#   #animate to zero
+#   can_stop = false
+#   while !can_stop
+#     values = pwm.values 
+#     can_stop = true 
+
+#     values.each_with_index do |v, i|
+#       if v > 0
+#         can_stop = false
+#         pwm.set_value(pwm_pin: i, pwm_value: (v - (step * 2)))
+#       end
+#     end
+
+#     pwm.flush_values if !can_stop
+#     sleep(0.005) if !can_stop
+#     break if can_stop
+#   end
+# end
+
+# #test()
