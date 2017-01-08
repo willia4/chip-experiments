@@ -16,7 +16,7 @@ SNMP_UPLOAD_COUNTER_OID = "IF-MIB::ifHCOutOctets.2"
 # a higher number will be smoother but will take longer to change
 # a lower number will be more accurate "in the moment", but may jump
 # all over the place 
-SMOOTHING_FACTOR = 4
+SMOOTHING_FACTOR = 5
 
 # the number of seconds between samples. 
 # A lower number will be more accurate and responsive but too many 
@@ -47,7 +47,7 @@ def show_bandwidth(pwm_pin, bandwidth_kbps, max_bandwidth)
   percent = 1 if percent > 1
 
   pwm_value = (percent * @pwm.max_value).ceil
-  puts "#{pwm_pin}pin #{bandwidth_kbps}: #{percent * 100}% : #{pwm_value}"
+  #puts "#{pwm_pin}pin #{bandwidth_kbps}: #{percent * 100}% : #{pwm_value}"
 
   @pwm.set_value(pwm_pin: pwm_pin, pwm_value: pwm_value)
   @pwm.flush_values()
