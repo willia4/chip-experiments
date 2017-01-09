@@ -16,13 +16,13 @@ require "#{File.expand_path(File.dirname(__FILE__))}/ring_buffer.rb"
 # # a higher number will be smoother but will take longer to change
 # # a lower number will be more accurate "in the moment", but may jump
 # # all over the place 
-# SMOOTHING_FACTOR = 10 
+# SMOOTHING_FACTOR = 5
 
 # # the number of seconds between samples. 
 # # A lower number will be more accurate and responsive but too many 
 # # samples may burden your SNMP agent or your polling device
 # # A larger delay gives worse results but is also better for battery life
-# SAMPLE_DELAY_SECONDS = 1.0 
+# SAMPLE_DELAY_SECONDS = 0.4
   
 class SpeedGetter < Object
   attr_reader :snmp_agent
@@ -35,9 +35,14 @@ class SpeedGetter < Object
     @snmp_counter = snmp_counter
 
     @deltas = RingBuffer.new(num_samples)
+
     @took_first_sample = false 
 
     @last_sample = 0
+
+
+    @samples = RingBuffer.new(num_samples)
+    num_samples.times { @samples << {:time => Time.now, :bytes => get_current_bytes} }
   end
 
   def get_current_bytes
@@ -50,37 +55,17 @@ class SpeedGetter < Object
     end
   end
 
-  def get_current_speed(sample_delay)
-    sleep(sample_delay)
-    current_sample = get_current_bytes()
+  def get_current_speed()
+    new_sample = {:time => Time.now, :bytes => get_current_bytes}
 
-    bits_per_second = 0
-    kilobits_per_second = 0
-    megabits_per_second = 0
+    min = @samples.min_by { |s| s[:time] }
+    @samples << new_sample
+    
+    diff_bytes = new_sample[:bytes] - min[:bytes]
+    diff_seconds = new_sample[:time] - min[:time]
 
-    if @took_first_sample
-      delta = current_sample - @last_sample
-      @last_sample = current_sample
+    bits_per_second = (diff_bytes * 8) / diff_seconds
 
-      @deltas << delta
-    else
-      @took_first_sample = true
-      # take a second sample right now to backfill the @deltas array with a diff
-      @last_sample = current_sample
-      sleep(sample_delay)
-      current_sample = get_current_bytes()
-
-      delta = current_sample - @last_sample
-      @last_sample = current_sample
-
-      @deltas.max_size.times { @deltas << delta }
-    end
-
-    bits_per_second = (@deltas.mean() / sample_delay) * 8.0
-
-    # the snmp counter can eventually roll over, which would lead to a negative
-    # delta; in that case, just reset to 0. This will get smoothed out by the 
-    # ring buffer once it makes another circuit 
     bits_per_second = 0 if bits_per_second < 0
 
     kilobits_per_second = bits_per_second / 1000.0
@@ -94,13 +79,14 @@ class SpeedGetter < Object
   end
 end
 
+# speed_getter = SpeedGetter.new(SNMP_AGENT, SNMP_COMMUNITY, SNMP_BANDWIDTH_COUNTER_OID, SMOOTHING_FACTOR)
+
 # $stop = false
 # trap("SIGINT") { $stop = true }
 
-# speed_getter = SpeedGetter.new(SNMP_AGENT, SNMP_COMMUNITY, SNMP_BANDWIDTH_COUNTER_OID, SMOOTHING_FACTOR)
-
 # while !$stop
-#   speed = speed_getter.get_current_speed(SAMPLE_DELAY_SECONDS)
+#   sleep(SAMPLE_DELAY_SECONDS)
+#   speed = speed_getter.get_current_speed_2()
 
 #   if speed[:megabits_per_second] > 1
 #     print "\r %.02f Mbps" % speed[:megabits_per_second]
@@ -111,8 +97,7 @@ end
 #   else
 #     print "\r %.02f Bps" % speed[:bits_per_second]
 #     print "                                           "
-#   end
-      
+#   end   
 # end
 
 # puts ""
