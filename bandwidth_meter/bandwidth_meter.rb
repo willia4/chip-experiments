@@ -16,19 +16,19 @@ SNMP_UPLOAD_COUNTER_OID = "IF-MIB::ifHCOutOctets.2"
 # a higher number will be smoother but will take longer to change
 # a lower number will be more accurate "in the moment", but may jump
 # all over the place 
-SMOOTHING_FACTOR = 4
+SMOOTHING_FACTOR = 3
 
 # the number of seconds between samples. 
 # A lower number will be more accurate and responsive but too many 
 # samples may burden your SNMP agent or your polling device
 # A larger delay gives worse results but is also better for battery life
-SAMPLE_DELAY_SECONDS = 0.05
+SAMPLE_DELAY_SECONDS = 0.03
 
 # The max expected bandwidth; this is the bandwidth that will appear
 # as 100%. Any bandwidth higher than this will be show as 100% for
 # display purposes
-MAX_DOWNLOAD_KBS = 300000
-MAX_UPLOAD_KBS = 80000
+MAX_DOWNLOAD_KBS = 37000
+MAX_UPLOAD_KBS = 8000
 
 @download_getter = SpeedGetter.new(SNMP_AGENT, SNMP_COMMUNITY, SNMP_DOWNLOAD_COUNTER_OID, SMOOTHING_FACTOR)
 @upload_getter = SpeedGetter.new(SNMP_AGENT, SNMP_COMMUNITY, SNMP_UPLOAD_COUNTER_OID, SMOOTHING_FACTOR)
@@ -60,15 +60,46 @@ download_meter_pwm_pin = 18
 upload_meter_pwm_pin = 12
 
 while !$stop
-  break if $stop
-  download = @download_getter.get_current_speed(SAMPLE_DELAY_SECONDS)
+  begin  
+    break if $stop
+    download = @download_getter.get_current_speed()
+  rescue => e
+    puts "Download Exception: #{e}"
+
+    download = {
+      :bits_per_second => 0,
+      :kilobits_per_second => 0,
+      :megabits_per_second => 0
+    }
+  end
+
+  begin
+    break if $stop
+    upload = @upload_getter.get_current_speed()
+  rescue => e
+    puts "Upload Exception: #{e}"
+
+    upload = {
+      :bits_per_second => 0,
+      :kilobits_per_second => 0,
+      :megabits_per_second => 0
+    }
+  end
+
+  begin
+    break if $stop
+    show_bandwidth(download_meter_pwm_pin, download[:kilobits_per_second], MAX_DOWNLOAD_KBS)
+  rescue => e
+    puts "Error showing download bandwidth: #{e}"
+  end
+
+  begin
+    break if $stop
+    show_bandwidth(upload_meter_pwm_pin, upload[:kilobits_per_second], MAX_UPLOAD_KBS)  
+  rescue => e
+    puts "Error showing upload bandwidth: #{e}"
+  end
 
   break if $stop
-  upload = @upload_getter.get_current_speed(SAMPLE_DELAY_SECONDS)
-
-  break if $stop
-  show_bandwidth(download_meter_pwm_pin, download[:kilobits_per_second], MAX_DOWNLOAD_KBS)
-
-  break if $stop
-  show_bandwidth(upload_meter_pwm_pin, upload[:kilobits_per_second], MAX_UPLOAD_KBS)  
+  sleep(SAMPLE_DELAY_SECONDS)
 end
