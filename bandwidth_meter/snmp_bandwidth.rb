@@ -1,7 +1,10 @@
 #!/usr/bin/env ruby
 
+require 'rubygems'
+require 'bundler/setup'
+
 require 'snmp'
-require "#{File.expand_path(File.dirname(__FILE__))}/ring_buffer.rb"
+require "./ring_buffer.rb"
 
 # # the host name or IP address of the the device to interrogate over snmp
 # SNMP_AGENT = 'router1'    
