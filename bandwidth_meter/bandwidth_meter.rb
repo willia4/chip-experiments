@@ -106,3 +106,5 @@ while !$stop
   break if $stop
   sleep(SAMPLE_DELAY_SECONDS)
 end
+
+@pwm.reset_all()

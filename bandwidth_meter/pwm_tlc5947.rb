@@ -57,7 +57,7 @@ module PWM_5947
     end
 
     def reset_all
-      num_pins.times.each { |i| values[i] = 0 }
+      num_pins.times.each { |i| @values[i] = 0 }
       flush_values()
     end
 
