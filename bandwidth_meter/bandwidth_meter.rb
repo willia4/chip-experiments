@@ -1,6 +1,9 @@
+require 'rubygems'
+require 'bundler/setup'
+
 require 'chip-gpio'
-require '../snmp/snmp_bandwidth.rb'
-require '../pwm_tlc5947/pwm_tlc5947.rb'
+require './snmp_bandwidth.rb'
+require './pwm_tlc5947.rb'
 
 # the host name or IP address of the the device to interrogate over snmp
 SNMP_AGENT = 'router1'    
@@ -103,3 +106,5 @@ while !$stop
   break if $stop
   sleep(SAMPLE_DELAY_SECONDS)
 end
+
+@pwm.reset_all()

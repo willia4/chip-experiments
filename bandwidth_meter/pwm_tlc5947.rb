@@ -1,3 +1,6 @@
+require 'rubygems'
+require 'bundler/setup'
+
 require 'chip-gpio'
 
 module PWM_5947
@@ -7,30 +10,20 @@ module PWM_5947
     attr_reader :max_value 
 
     def initialize(latch_pin: null, clock_pin: null, data_pin: null)
-      pins = ChipGPIO.get_pins
-      
-      @latch = pins[latch_pin]
-      @clock = pins[clock_pin]
-      @data = pins[data_pin]
-
-      @latch.export if not @latch.available?
-      @clock.export if not @clock.available?
-      @data.export if not @data.available?
-
-      @latch.direction = :output
-      @clock.direction = :output
-      @data.direction = :output
-
-      @latch.value = 0
-      @clock.value = 0
-      @data.value = 0
-
       @num_pins = 24
       @resolution_bits = 12
-      @max_value = (2**@resolution_bits)-1
+
+      @spi = ChipGPIO::SoftSPI.new(clock_pin: clock_pin, output_pin: data_pin, word_size: @resolution_bits, polarity: 1)
+      @max_value = @spi.max_word
+
+
+      @latch = ChipGPIO.get_pins()[latch_pin]
+      @latch.export if not @latch.available?
+      @latch.direction = :output
+      @latch.value = 0
 
       @values = Array.new
-      @num_pins.times { @values.push(0) }
+      @num_pins.times { @values << 0 }
 
       self.reset_all()
     end
@@ -57,31 +50,14 @@ module PWM_5947
 
     def flush_values()
       #write out the pins in reverse order 
-      #(use the ... range operator to be an exclusive range as well)
-      (0...@num_pins).reverse_each do |pwm|
-        pwm_value = @values[pwm]
-
-        #write out the bits in reverse order as well 
-        (0...@resolution_bits).reverse_each do |bit|
-          @clock.value = 0
-
-          if (pwm_value & (1 << bit)) > 0
-            @data.value = 1
-          else
-            @data.value = 0
-          end
-
-          @clock.value = 1
-        end
-      end
-
-      @clock.value = 0
+      @spi.write(words: @values, reverse_output: true)
+      
       @latch.value = 1
       @latch.value = 0
     end
 
     def reset_all
-      num_pins.times.each { |i| values[i] = 0 }
+      num_pins.times.each { |i| @values[i] = 0 }
       flush_values()
     end
 
