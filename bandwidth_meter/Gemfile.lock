@@ -1,14 +1,14 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    chip-gpio (0.0.5)
+    chip-gpio (0.0.6)
     snmp (1.2.0)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
-  chip-gpio (>= 0.0.5)
+  chip-gpio (>= 0.0.6)
   snmp
 
 BUNDLED WITH

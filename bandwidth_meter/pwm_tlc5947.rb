@@ -49,9 +49,12 @@ module PWM_5947
     end
 
     def flush_values()
-      #write out the pins in reverse order 
-      @spi.write(words: @values, reverse_output: true)
+      #the chip expects pin 0 to be the last pin it sees so we need to 
+      #reverse the array before writing it out (so values[0] will be the last 
+      #word written )
+      @spi.write(words: @values.reverse())
       
+      #toggle the latch to actually update the output pins
       @latch.value = 1
       @latch.value = 0
     end
