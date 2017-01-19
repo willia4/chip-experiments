@@ -1,5 +1,5 @@
 # frozen_string_literal: true
 source "https://rubygems.org"
 
-gem 'chip-gpio', '>= 0.0.6'
+gem 'chip-gpio', '>= 0.1.2'
 gem 'snmp'

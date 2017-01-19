@@ -13,7 +13,7 @@ module PWM_5947
       @num_pins = 24
       @resolution_bits = 12
 
-      @spi = ChipGPIO::SoftSPI.new(clock_pin: clock_pin, output_pin: data_pin, word_size: @resolution_bits, polarity: 1)
+      @spi = ChipGPIO::SoftwareSPI.new(clock_pin: clock_pin, output_pin: data_pin, word_size: @resolution_bits, polarity: 1)
       @max_value = @spi.max_word
 
 
