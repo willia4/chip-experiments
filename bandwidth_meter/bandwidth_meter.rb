@@ -56,11 +56,27 @@ def show_bandwidth(pwm_pin, bandwidth_kbps, max_bandwidth)
   @pwm.flush_values()
 end
 
-$stop = $false
-trap("SIGINT") { $stop = true }
-
 download_meter_pwm_pin = 18
 upload_meter_pwm_pin = 12
+
+# Waggle the meters just to prove that it's working
+  @pwm.set_value(pwm_pin: download_meter_pwm_pin, pwm_value: (0.75 * @pwm.max_value).ceil)
+  @pwm.set_value(pwm_pin: upload_meter_pwm_pin, pwm_value: (0.25 * @pwm.max_value).ceil)
+  @pwm.flush_values()
+  sleep(0.2)
+
+  @pwm.set_value(pwm_pin: download_meter_pwm_pin, pwm_value: (0.25 * @pwm.max_value).ceil)
+  @pwm.set_value(pwm_pin: upload_meter_pwm_pin, pwm_value: (0.75 * @pwm.max_value).ceil)
+  @pwm.flush_values()
+  sleep(0.2)
+
+  @pwm.set_value(pwm_pin: download_meter_pwm_pin, pwm_value: 0)
+  @pwm.set_value(pwm_pin: upload_meter_pwm_pin, pwm_value: 0)
+  @pwm.flush_values()
+# End waggle
+
+$stop = $false
+trap("SIGINT") { $stop = true }
 
 while !$stop
   begin  
