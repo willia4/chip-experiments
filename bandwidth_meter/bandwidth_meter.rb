@@ -25,7 +25,7 @@ SMOOTHING_FACTOR = 3
 # A lower number will be more accurate and responsive but too many 
 # samples may burden your SNMP agent or your polling device
 # A larger delay gives worse results but is also better for battery life
-SAMPLE_DELAY_SECONDS = 0.03
+SAMPLE_DELAY_SECONDS = 0.1
 
 # The max expected bandwidth; this is the bandwidth that will appear
 # as 100%. Any bandwidth higher than this will be show as 100% for
