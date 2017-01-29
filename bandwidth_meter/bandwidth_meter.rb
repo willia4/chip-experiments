@@ -131,7 +131,7 @@ $stop = $false
 trap("SIGINT") { $stop = true }
 
 @history = RingBuffer.new(HISTORY_COUNT)
-HISTORY_COUNT.times { @history << {:upload => MAX_UPLOAD_KBS, :download => MAX_DOWNLOAD_KBS} }
+HISTORY_COUNT.times { @history << {:upload => 0, :download => 0} }
 
 @pwm.set_value(pwm_pin: backlight_pwm_pin, pwm_value: @pwm.max_value)
 
@@ -176,7 +176,7 @@ while !$stop
     puts "Error showing upload bandwidth: #{e}"
   end
 
-  #@history << {:upload => upload[:kilobits_per_second], :download => download[:kilobits_per_second]}
+  @history << {:upload => upload[:kilobits_per_second], :download => download[:kilobits_per_second]}
   draw_history()
 
   break if $stop
