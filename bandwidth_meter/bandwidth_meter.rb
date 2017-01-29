@@ -35,7 +35,7 @@ SAMPLE_DELAY_SECONDS = 1.0
 MAX_DOWNLOAD_KBS = 37000
 MAX_UPLOAD_KBS = 8000
 
-HISTORY_COUNT = 16
+HISTORY_COUNT = 32
 
 @download_getter = SpeedGetter.new(SNMP_AGENT, SNMP_COMMUNITY, SNMP_DOWNLOAD_COUNTER_OID, SMOOTHING_FACTOR)
 @upload_getter = SpeedGetter.new(SNMP_AGENT, SNMP_COMMUNITY, SNMP_UPLOAD_COUNTER_OID, SMOOTHING_FACTOR)
@@ -83,11 +83,9 @@ def draw_history
     download_percent = (cur[:download] / (MAX_DOWNLOAD_KBS + 0.0))
     download_height = (download_percent * height).ceil
 
-    puts "Download %: #{download_percent}, Upload %: #{upload_percent}"
-
     y = download_y + (height - download_height)
     @oled.fill_rectangle(x, y, width - width_gutter, download_height)
-    
+
     y = upload_y + (height - upload_height)
     @oled.fill_rectangle(x, y, width - width_gutter, upload_height)
 
