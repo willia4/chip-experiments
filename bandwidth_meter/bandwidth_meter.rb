@@ -76,10 +76,12 @@ def draw_history
     upload_percent = (cur[:upload] / (MAX_UPLOAD_KBS + 0.0))
     upload_height = (upload_percent * height).ceil
     upload_height = height if upload_height > height 
+    upload_height = 1 if upload_height == 0 #always draw at least one pixel; otherwise it's weird
 
     download_percent = (cur[:download] / (MAX_DOWNLOAD_KBS + 0.0))
     download_height = (download_percent * height).ceil
     download_height = height if download_height > height 
+    download_height = 1 if download_height == 0 #always draw at least one pixel; otherwise it's weird
 
     y = download_y + (height - download_height)
     @oled.fill_rectangle(x, y, width - width_gutter, download_height)
