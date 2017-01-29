@@ -241,48 +241,48 @@ module OLED_SSD1306
   end
 end
 
-# def test
-#   puts "Here"
-#   oled = OLED_SSD1306::OLED.new(data_command_pin: :CSI1, reset_pin: :CSI3)
+def oled_test
+  puts "Here"
+  oled = OLED_SSD1306::OLED.new(data_command_pin: :CSI1, reset_pin: :CSI3)
 
-#   size = 16
-#   x = 0
-#   y = (oled.display_height / 2) - (size / 2)
+  size = 16
+  x = 0
+  y = (oled.display_height / 2) - (size / 2)
 
-#   min_x = 0
-#   max_x = (oled.display_width - size)
-#   min_y = y - size
-#   max_y = y + size 
+  min_x = 0
+  max_x = (oled.display_width - size)
+  min_y = y - size
+  max_y = y + size 
 
-#   d_x = 4
-#   d_y = 1
+  d_x = 4
+  d_y = 1
 
-#   while true 
-#     oled.checkerboard_rectangle(x, y, size, size, 2)
-#     oled.flush_pixels()
-#     oled.clear_rectangle(x, y, size, size)
+  while true 
+    oled.checkerboard_rectangle(x, y, size, size, 2)
+    oled.flush_pixels()
+    oled.clear_rectangle(x, y, size, size)
 
-#     x += d_x 
-#     y += d_y 
+    x += d_x 
+    y += d_y 
 
-#     if x >= max_x
-#       x = max_x
-#       d_x = -d_x
-#     elsif x <= min_x
-#       x = min_x
-#       d_x = -d_x
-#     end 
+    if x >= max_x
+      x = max_x
+      d_x = -d_x
+    elsif x <= min_x
+      x = min_x
+      d_x = -d_x
+    end 
 
-#     if y >= max_y
-#       y = max_y
-#       d_y = -d_y
-#     elsif  y <= min_y
-#       y = min_y
-#       d_y = -d_y 
-#     end
+    if y >= max_y
+      y = max_y
+      d_y = -d_y
+    elsif  y <= min_y
+      y = min_y
+      d_y = -d_y 
+    end
 
-#     sleep(0.3)
-#   end
-# end
+    sleep(0.3)
+  end
+end
 
-# test()
+#oled_test()
