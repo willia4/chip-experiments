@@ -35,7 +35,11 @@ SAMPLE_DELAY_SECONDS = 1.0
 MAX_DOWNLOAD_KBS = 37000
 MAX_UPLOAD_KBS = 8000
 
-HISTORY_COUNT = 32
+# The past N measurements to display on the screen 
+# Each bar will be ((screenWidth / 2) - 1) pixels high
+# (with one pixel used as a separator for the next bar)
+# so keep the screenWidth in mind while setting this. \
+HISTORY_COUNT = 64
 
 @download_getter = SpeedGetter.new(SNMP_AGENT, SNMP_COMMUNITY, SNMP_DOWNLOAD_COUNTER_OID, SMOOTHING_FACTOR)
 @upload_getter = SpeedGetter.new(SNMP_AGENT, SNMP_COMMUNITY, SNMP_UPLOAD_COUNTER_OID, SMOOTHING_FACTOR)
@@ -43,22 +47,14 @@ HISTORY_COUNT = 32
 @pwm = PWM_5947::PWM.new(latch_pin: :XIO1, data_pin: :XIO5, clock_pin: :XIO3)
 @oled = OLED_SSD1306::OLED.new(data_command_pin: :CSI1, reset_pin: :CSI3)
 
-
-#@pwm.set_value(pwm_pin: download_meter_pwm_pin, pwm_value: 3000)
-#@pwm.flush_values()
-
-#show_activity()
-
 def show_bandwidth(pwm_pin, bandwidth_kbps, max_bandwidth)
   percent = (bandwidth_kbps / max_bandwidth)
   percent = 1 if percent > 1
 
   pwm_value = (percent * @pwm.max_value).ceil
-  #puts "#{pwm_pin}pin #{bandwidth_kbps}: #{percent * 100}% : #{pwm_value}"
-  puts "#{pwm_pin}pin #{bandwidth_kbps.round(5)} kbps"
+  puts "pin #{pwm_pin} - #{bandwidth_kbps.round(5)} kbps"
 
   @pwm.set_value(pwm_pin: pwm_pin, pwm_value: pwm_value)
-  @pwm.flush_values()
 end
 
 def draw_history 
@@ -69,7 +65,7 @@ def draw_history
   height = (@oled.display_height / 2) - height_gutter
 
   download_y = 0
-  upload_y = download_y + height
+  upload_y = download_y + height + height_gutter
   
   @oled.clear_display()
 
@@ -79,9 +75,11 @@ def draw_history
     
     upload_percent = (cur[:upload] / (MAX_UPLOAD_KBS + 0.0))
     upload_height = (upload_percent * height).ceil
+    upload_height = height if upload_height > height 
 
     download_percent = (cur[:download] / (MAX_DOWNLOAD_KBS + 0.0))
     download_height = (download_percent * height).ceil
+    download_height = height if download_height > height 
 
     y = download_y + (height - download_height)
     @oled.fill_rectangle(x, y, width - width_gutter, download_height)
@@ -91,8 +89,6 @@ def draw_history
 
     x += width
   end
-
-  @oled.flush_pixels()
 end
 
 download_meter_pwm_pin = 18
@@ -135,7 +131,7 @@ $stop = $false
 trap("SIGINT") { $stop = true }
 
 @history = RingBuffer.new(HISTORY_COUNT)
-HISTORY_COUNT.times { @history << {:upload => 0, :download => 0} }
+HISTORY_COUNT.times { @history << {:upload => MAX_UPLOAD_KBS, :download => MAX_DOWNLOAD_KBS} }
 
 @pwm.set_value(pwm_pin: backlight_pwm_pin, pwm_value: @pwm.max_value)
 
@@ -180,9 +176,14 @@ while !$stop
     puts "Error showing upload bandwidth: #{e}"
   end
 
-  @history << {:upload => upload[:kilobits_per_second], :download => download[:kilobits_per_second]}
+  #@history << {:upload => upload[:kilobits_per_second], :download => download[:kilobits_per_second]}
   draw_history()
+
   break if $stop
+
+  @oled.flush_pixels()
+  @pwm.flush_values()
+  
   sleep(SAMPLE_DELAY_SECONDS)
 end
 
